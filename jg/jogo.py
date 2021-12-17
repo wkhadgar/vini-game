@@ -4,12 +4,12 @@ import pygame
 import random
 import numpy as np
 import time
+pygame.init()
 
 
 fps = 120
 clock = pygame.time.Clock()
-screen = pygame.display.set_mode((0,0), pygame.FULLSCREEN)
-width, height = screen.get_size()
+#screen = pygame.display.set_mode((0,0), pygame.FULLSCREEN)
 
 PRETO = (0,0,0)
 CINZA_ESCURO = (50, 50, 50)
@@ -21,8 +21,12 @@ AMARELO = (255, 255, 0)
 GOLDEN = (200,200,30)
 ROXO = (255, 0, 255)
 CYAN = (0, 255, 255)
+WINDOW_SURFACE   = pygame.HWSURFACE|pygame.DOUBLEBUF
 
 cores = [BRANCO, VERMELHO, VERDE, AZUL, ROXO, CYAN]
+infoObject = pygame.display.Info()
+screen =  pygame.display.set_mode((infoObject.current_w, infoObject.current_h), WINDOW_SURFACE)
+width, height = screen.get_size()
 
 class Border:
     def __init__(self, origin_x, origin_y, wid, hei, cor=VERMELHO) -> None:
@@ -210,10 +214,13 @@ def main():
 
     player_keys = [("player 1", [pygame.K_w, pygame.K_s, pygame.K_a, pygame.K_d]),
         ("player 2", [pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT])]
+    bkp_player_keys = player_keys
     player_keys = player_keys[:2]
     difs = ["FÁCIL", "NORMAL", "DIFÍCIL"]
     dificuldade = 1
     n_players = len(player_keys)
+    i_n_players = 1
+                
 
     jogadores = []
     if n_players > 1:
@@ -221,6 +228,7 @@ def main():
             jogadores.append(Player((f"Jogador {i}").strip().capitalize(), random.choice(cores)))
     else:
         jogadores.append(Player("", random.choice(cores)))
+    bkp_jog = jogadores
 
 
     edge = Border(0,0, width, height)
@@ -229,24 +237,29 @@ def main():
     pwup = PowerUp("teste", AMARELO)
     power_ups = []
 
-    iniciar_but = Button((width/2-100,height-300), 1, tamanho=(200,50), text="INICIAR", xo=45)
-    difc_but = Button((width/2-180,height-200), 2, tamanho=(360,50), text=f"DIFICULDADE: {difs[dificuldade]}", xo=7)
-    sair_but = Button((width/2-100,height-100), 3, tamanho=(200,50), text="SAIR", xo=65)
-    all_botoes = [iniciar_but, difc_but , sair_but]
 
+    iniciar_but = Button((width/2-100,height-300), 0, tamanho=(200,50), text="INICIAR", xo=45)
+    difc_but = Button((width/2-180,height-200), 1, tamanho=(360,50), text=f"DIFICULDADE: {difs[dificuldade]}", xo=7)
+    sair_but = Button((width/2-100,height-100), 2, tamanho=(200,50), text="SAIR", xo=65)
+    num_player_but = Button((width/2-125,height-400), 3, tamanho=(250,50), text=f"JOGADORES: {n_players}", xo=7)
+    restart_but = Button((width/2-100, height-200), 4, tamanho=(200,50), text="RESTART", xo=40)
+
+    start_botoes = [num_player_but, iniciar_but, difc_but , sair_but]
+    pause_botoes = [iniciar_but, difc_but , sair_but]
+    finish_botoes = [restart_but, sair_but]
 
 
     run = True
     playing = True
     start =  False
     first_action = True
-    defeat_triggers = [False]*len(jogadores)
+    defeat_triggers = [False]*n_players
     inicio = time.time()
     tempo_pausa = 0
     timer = 0
     debuffs = {2: "voce vai ficar maior!", 3: "voce vai acelerar! (e muito)", 4: "o espaço vai ficar menor?"} #go to line 298
     level_triggers = [True]*100
-    clicado = 0
+    clicado = -1
     last = 1
     selecionado = 1
 
@@ -301,12 +314,25 @@ def main():
                         elif event.key == player[1][3]:
                             jogadores[i].go_right = True
                 else:
+                    if first_action:
+                        target_botoes = start_botoes
+                    elif playing:
+                        target_botoes = pause_botoes
+                    else:
+                        target_botoes = finish_botoes
+                        print("acabouuuuuuuuuu")
+                        print(target_botoes)
+                    
+                    selec_n = [but.id for but in target_botoes]
                     if event.key == pygame.K_UP:
-                        selecionado = ((selecionado-2)%len(all_botoes))+1
+                        selecionado = (selecionado-1)%len(target_botoes)
+                        selecionado_main = selec_n[selecionado]
                     if event.key == pygame.K_DOWN:
-                        selecionado = ((selecionado+3)%len(all_botoes))+1
+                        selecionado = (selecionado+1)%len(target_botoes)
+                        selecionado_main = selec_n[selecionado]
+
                     if event.key == pygame.K_RETURN:
-                        for i, but in enumerate(all_botoes):
+                        for i, but in enumerate(target_botoes):
                             if but.foco:
                                 clicado = but.id
 
@@ -383,40 +409,79 @@ def main():
                 
                 if all(defeat_triggers):
                     playing = False
-
-                
+                    print("morreu todos")
             else:
+                start = False
+                print("isso dpeois ")
+
+        else:
+            if not playing:
                 #endgame state
                 final_scores = []
                 utils.screen_print(screen, "FIM DE JOGO", BRANCO, (width/2)-190, (height/4)-30, 60)
                 utils.screen_print(screen, "PLACAR FINAL", BRANCO, (width/2)-105, (height/3), 30)
+
+                for but in finish_botoes:
+                    but.draw(screen, selected=selecionado_main)
+                
+                if clicado == 4:
+                    inicio = time.time()
+                    tempo_pausa = 0
+                    timer = 0
+                    defeat_triggers = [False]*n_players
+                    for p in jogadores:
+                        p.health = 10
+                        p.defeat_time=0
+                        p.size = min(height, width) / 15
+                        playing = True
+                        p.x = random.randint(200, width-200)
+                        p.y = random.randint(200, height-200)
+                        p.speed = 0.5
+
+                if clicado == 2: 
+                    run = False
+
                 for p in jogadores:
                     final_scores.append([p.defeat_time, p.cor, p.name])
                 final_scores.sort(reverse=True)
                 ordem_lista = 0
                 for score in final_scores:
                     ordem_lista += 1
-                    utils.screen_print(screen, f"{ordem_lista}º: {score[2]} - {score[0]}", score[1], (width/2)-100, (height/2.8)+40*ordem_lista, 30)
+                    utils.screen_print(screen, f"{ordem_lista}º: {score[2]} - {score[0]}", score[1], (width/2)-140, (height/2.8)+40*ordem_lista, 30)
 
-        else:
-            screen.blit(menu_bg, (0,0))
-
-            for but in all_botoes:
-                but.draw(screen, selected=selecionado)
-
-            if clicado == 1:
+        
+            else:
+                screen.blit(menu_bg, (0,0))
                 if first_action:
-                    inicio = time.time()
-                    iniciobkp = inicio
-                    first_action = False
-                start = True
-                clicado = -1
-            if clicado == 2:
-                dificuldade = (dificuldade+1)%len(difs)
-                all_botoes[1].texto = f"DIFICULDADE: {difs[dificuldade]}"
-                clicado = -1
-            if clicado == 3:
-                run = False
+                    for but in start_botoes:
+                        but.draw(screen, selected=selecionado)
+                else:
+                    for but in pause_botoes:
+                        but.draw(screen, selected=selecionado)
+
+                if clicado == 0:
+                    if first_action:
+                        inicio = time.time()
+                        iniciobkp = inicio
+                        first_action = False
+                    start = True
+                    clicado = -1
+                if clicado == 1:
+                    dificuldade = (dificuldade+1)%len(difs)
+                    pause_botoes[1].texto = f"DIFICULDADE: {difs[dificuldade]}"
+                    clicado = -1
+                if clicado == 2:
+                    run = False
+                if clicado == 3:
+                    jog_ = [1,2]
+                    i_n_players = (i_n_players+1)%2
+                    n_players = jog_[i_n_players]
+                    player_keys = bkp_player_keys[:n_players]
+                    defeat_triggers = [False]*n_players
+                    start_botoes[0].texto = f"JOGADORES: {n_players}"
+                    jogadores = bkp_jog[:(n_players)]
+                    clicado = -1
+
         pygame.display.update()
         clock.tick(fps)
 
@@ -425,6 +490,5 @@ def main():
 
 if __name__ == '__main__':
 
-    pygame.init()
     pygame.font.init()
     main()
